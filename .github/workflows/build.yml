@@ -1,25 +1,174 @@
-name: Build
-on: [push, pull_request]
+#     GITHUB_REF = 'refs/heads/main'
+#     GITHUB_ACTOR = 'SegiMan'
+#     INPUT_BUILDOZER_VERSION = 'master'
+#     GITHUB_ACTOR_ID = '63049475'
+#     GITHUB_PATH = '/github/file_commands/add_path_9b343c51-8be3-43be-89d9-b0d3bfa37d7d'
+#     RUNNER_WORKSPACE = '/home/runner/work/Yamb'
+#     LC_ALL = 'en_US.UTF-8'
+#     PWD = '/github/workspace'
+#     GITHUB_SERVER_URL = 'https://github.com'
+#     GITHUB_EVENT_NAME = 'push'
+#     GITHUB_OUTPUT = '/github/file_commands/set_output_9b343c51-8be3-43be-89d9-b0d3bfa37d7d'
+#     INPUT_REPOSITORY_ROOT = '.'
+#     GITHUB_STEP_SUMMARY = '/github/file_commands/step_summary_9b343c51-8be3-43be-89d9-b0d3bfa37d7d'
+#     PACKAGES_PATH = '/github/workspace/./.buildozer_global/android/packages'
+#     ANDROIDSDK = '/github/workspace/./.buildozer_global/android/platform/android-sdk'
+#     ANDROIDNDK = '/github/workspace/./.buildozer_global/android/platform/android-ndk-r25b'
+#     ANDROIDAPI = '31'
+#     ANDROIDMINAPI = '21'
+# 
+# Buildozer failed to execute the last command
+# The error might be hidden in the log above this error
+# Please read the full log, and search for it before
+# raising an issue with buildozer itself.
+# In case of a bug report, please add a full log with log_level = 2
+Traceback (most recent call last):
+  File "/action/entrypoint.py", line 159, in <module>
+    main()
+  File "/action/entrypoint.py", line 27, in main
+    run_command(env["INPUT_COMMAND"])
+  File "/action/entrypoint.py", line 135, in run_command
+    retcode = subprocess.check_call(command, shell=True)
+  File "/usr/lib/python3.8/subprocess.py", line 364, in check_call
+    raise CalledProcessError(retcode, cmd)
+subprocess.CalledProcessError: Command 'buildozer android debug' returned non-zero exit status 1.
+pythongithubkivyapkbuildozer
+Share
+Follow
+asked Dec 8, 2023 at 13:02
+Marko's user avatar
+Marko
+8355 bronze badges
+hey, did you find a solution? I'm getting the same error, only started with kivy today – 
+kurdemol94
+ CommentedMay 24, 2024 at 19:54
+1
+No, sorry, nothing solved it yet. In the end I got arround to doing other things and never got back to it. I got it running with pydroid directly on the phone, but not as an apk (simply running the code), which does not really solve the problem in any way. – 
+Marko
+ CommentedJun 13, 2024 at 6:31
+Add a comment
+
+Report this ad
+1 Answer
+Sorted by:
+
+Highest score (default)
+0
+
+Use the workflow below. It fully automates the build process accepting the licenses vanishing all errors during the apk build.
+
+# Sample repository at https://github.com/Novfensec/SAMPLE-KIVYMD-APP
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
-  # Build job. Builds app for Android with Buildozer
-  build-android:
-    name: Build for Android
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
-      - name: Build with Buildozer
-        uses: ArtemSBulgakov/buildozer-action@v1
-        id: buildozer
+      # Used to cache dependencies with a timeout
+      - name: Get Date
+        id: get-date
+        run: |
+          echo "::set-output name=date::$(/bin/date -u "+%Y%m%d")"
+        shell: bash
+
+      - name: Cache Buildozer global directory
+        uses: actions/cache@v2
         with:
-          workdir: test_app
-          buildozer_version: stable
+          path: .buildozer_global
+          key: buildozer-global-${{ hashFiles('buildozer.spec') }}
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+      - uses: actions/cache@v2
+        with:
+          path: .buildozer
+          key: ${{ runner.os }}-${{ steps.get-date.outputs.date }}-${{ hashFiles('buildozer.spec') }}
+
+      # Install dependencies
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt-get install -y \
+            build-essential \
+            git \
+            ffmpeg \
+            libsdl2-dev \
+            libsdl2-image-dev \
+            libsdl2-mixer-dev \
+            libsdl2-ttf-dev \
+            libportmidi-dev \
+            libswscale-dev \
+            libavformat-dev \
+            libavcodec-dev \
+            libunwind-dev \
+            zlib1g-dev
+          sudo apt-get install -y \
+            libsqlite3-dev \
+            sqlite3 \
+            bzip2 \
+            libbz2-dev \
+            zlib1g-dev \
+            openssl \
+            libgdbm-dev \
+            libgdbm-compat-dev \
+            liblzma-dev \
+            libreadline-dev \
+            uuid-dev \
+            libgstreamer1.0 \
+            gstreamer1.0-plugins-base \
+            gstreamer1.0-plugins-good
+          sudo apt-get install -y \
+            zip \
+            unzip \
+            autoconf \
+            libtool \
+            pkg-config \
+            libncurses5-dev \
+            libncursesw5-dev \
+            libtinfo5 \
+            cmake \
+            libffi-dev \
+            libssl-dev \
+            automake
+
+      # Set up Java 17 required by Gradle
+      - name: Setup Java 17 required by Gradle
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'  # or 'zulu', 'liberica', etc.
+          java-version: '17'
+
+      # Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8' #set your python version
+
+      # Install pip dependencies
+      - name: Install pip dependencies
+        run: |
+          pip install --upgrade pip
+          pip install buildozer cython==0.29.33
+
+      # Build with Buildozer
+      - name: Build with Buildozer
+        id: buildozer
+        run: |
+          yes | buildozer -v android debug
+
+      # Upload artifacts
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
         with:
           name: package
-          path: ${{ steps.buildozer.outputs.filename }}
+          path: bin/*.apk
