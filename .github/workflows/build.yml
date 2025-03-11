@@ -69,7 +69,6 @@ jobs:
           sudo apt-get install -y \
             zip \
             unzip \
-            autoconf \
             libtool \
             pkg-config \
             libncurses5-dev \
